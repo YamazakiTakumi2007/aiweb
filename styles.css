@@ -1,6 +1,6 @@
 /* Global Reset and Variables */
 :root {
-  /* Dark Mode Colors */
+  /* Default Dark Mode Colors */
   --bg-primary: #1a1a2e;
   --bg-secondary: #16213e;
   --bg-card: #16213e;
@@ -8,7 +8,7 @@
   --text-secondary: #b8c5d6;
   --text-muted: #7a8496;
   
-  /* Neon Accent Colors */
+  /* Accent Colors */
   --color-primary: #0f3460;
   --color-accent: #e94560;
   --color-success: #10b981;
@@ -25,6 +25,34 @@
   --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.25);
   --shadow-large: 0 8px 32px rgba(0, 0, 0, 0.35);
   --shadow-neon: 0 0 20px rgba(233, 69, 96, 0.3);
+
+/* Light Theme Variables */
+[data-theme="light"] {
+  /* Light Mode Colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-card: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #4a5568;
+  --text-muted: #718096;
+  
+  /* Light Mode Accent Colors */
+  --color-primary: #3182ce;
+  --color-accent: #e53e3e;
+  --color-success: #38a169;
+  --color-warning: #d69e2e;
+  --color-danger: #e53e3e;
+  
+  /* Light Mode Glass Effect */
+  --glass-bg: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(0, 0, 0, 0.1);
+  
+  /* Light Mode Shadows */
+  --shadow-small: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.15);
+  --shadow-large: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --shadow-neon: 0 0 20px rgba(49, 130, 206, 0.3);
+}
   
   /* Borders */
   --border-radius: 12px;
@@ -1399,6 +1427,227 @@ body {
 .highlight-analysis {
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
+}
+
+/* Theme Transition Effects */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Enhanced Theme-Aware Components */
+.app-container {
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  min-height: 100vh;
+  transition: var(--transition-base);
+}
+
+.header {
+  background: var(--glass-bg);
+  backdrop-filter: var(--backdrop-blur);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-medium);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-large);
+}
+
+/* Theme-aware form elements */
+input, select, textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--glass-border);
+}
+
+/* Theme-aware buttons */
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  color: white;
+  box-shadow: var(--shadow-small);
+}
+
+.btn-primary:hover {
+  box-shadow: var(--shadow-neon);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+}
+
+.btn-secondary:hover {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+/* Theme-aware modal */
+.modal {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="light"] .modal {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.modal-content {
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-large);
+}
+
+/* Theme-aware upload area */
+.upload-area {
+  background: var(--glass-bg);
+  border: 2px dashed var(--glass-border);
+}
+
+.upload-area:hover,
+.upload-area.dragover {
+  border-color: var(--color-accent);
+  background: rgba(233, 69, 96, 0.1);
+}
+
+[data-theme="light"] .upload-area:hover,
+[data-theme="light"] .upload-area.dragover {
+  background: rgba(229, 62, 62, 0.05);
+}
+
+/* Theme-aware navigation */
+.nav-btn {
+  color: var(--text-secondary);
+  transition: var(--transition-fast);
+}
+
+.nav-btn:hover,
+.nav-btn.active {
+  color: var(--color-accent);
+  background: rgba(233, 69, 96, 0.1);
+}
+
+[data-theme="light"] .nav-btn:hover,
+[data-theme="light"] .nav-btn.active {
+  background: rgba(229, 62, 62, 0.05);
+}
+
+/* Theme-aware game selection */
+.game-option {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+.game-option:hover {
+  border-color: var(--color-accent);
+  background: rgba(233, 69, 96, 0.1);
+  transform: translateY(-2px);
+}
+
+.game-option.selected {
+  border-color: var(--color-accent);
+  background: rgba(233, 69, 96, 0.2);
+  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.3);
+}
+
+/* Theme-aware analysis results */
+.analysis-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-medium);
+}
+
+.stat-box {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="light"] .stat-box {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* Smooth animations */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.card {
+  animation: slideInUp 0.4s ease;
+}
+
+.modal-content {
+  animation: slideInUp 0.3s ease;
+}
+
+.page.active {
+  animation: fadeIn 0.3s ease;
+}
+
+/* Theme toggle button enhancement */
+.theme-btn {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  padding: 0.5rem;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-btn:hover {
+  background: var(--color-accent);
+  color: white;
+  transform: scale(1.1) rotate(15deg);
+  box-shadow: var(--shadow-neon);
+}
+
+/* Loading overlay theme-aware */
+.loading-overlay {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+[data-theme="light"] .loading-overlay {
+  background: rgba(255, 255, 255, 0.8);
 }
 
 /* Toast Messages */
