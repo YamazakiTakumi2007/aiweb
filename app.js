@@ -32,6 +32,15 @@ class App {
         if (typeof GameManager !== 'undefined') {
             this.gameManager = new GameManager();
         }
+        
+        // Geminiサービス
+        if (typeof GeminiService !== 'undefined') {
+            this.geminiService = new GeminiService();
+        }
+        
+        // メディア解析用のファイル配列
+        this.uploadedFiles = [];
+        this.chatMessages = [];
     }
     
     init() {
@@ -48,6 +57,12 @@ class App {
         
         // ナビゲーションの初期化
         this.initNavigation();
+        
+        // チャット機能の初期化
+        this.initChat();
+        
+        // メディア解析機能の初期化
+        this.initMediaAnalysis();
         
         // 初期ページの表示
         this.showPage(this.currentPage);
@@ -854,6 +869,611 @@ class App {
         }
         
         this.updateApiStatus(!!hasKey);
+    }
+
+    // === チャット機能 ===
+    initChat() {
+        console.log('Initializing chat...');
+        
+        // API設定関連
+        this.setupChatApiSettings();
+        
+        // チャット入力関連
+        this.setupChatInput();
+        
+        // メッセージ履歴を復元
+        this.loadChatHistory();
+    }
+    
+    setupChatApiSettings() {
+        // APIキー設定
+        const saveKeyBtn = document.getElementById('save-gemini-key');
+        const testConnectionBtn = document.getElementById('test-gemini-connection');
+        const toggleKeyBtn = document.getElementById('toggle-gemini-key');
+        const apiKeyInput = document.getElementById('gemini-api-key');
+        
+        if (saveKeyBtn) {
+            saveKeyBtn.addEventListener('click', () => this.saveGeminiApiKey());
+        }
+        
+        if (testConnectionBtn) {
+            testConnectionBtn.addEventListener('click', () => this.testGeminiConnection());
+        }
+        
+        if (toggleKeyBtn && apiKeyInput) {
+            toggleKeyBtn.addEventListener('click', () => {
+                const isPassword = apiKeyInput.type === 'password';
+                apiKeyInput.type = isPassword ? 'text' : 'password';
+                toggleKeyBtn.textContent = isPassword ? '🙈' : '👁️';
+            });
+        }
+        
+        // 既存のAPIキーを読み込み
+        if (apiKeyInput && this.geminiService) {
+            apiKeyInput.value = this.geminiService.getApiKey();
+        }
+    }
+    
+    setupChatInput() {
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-message');
+        const clearBtn = document.getElementById('clear-chat');
+        
+        if (chatInput) {
+            // 自動リサイズ
+            chatInput.addEventListener('input', () => {
+                chatInput.style.height = 'auto';
+                chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+                
+                // 送信ボタンの有効/無効
+                if (sendBtn) {
+                    sendBtn.disabled = !chatInput.value.trim();
+                }
+            });
+            
+            // Enter キーで送信
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendChatMessage();
+                }
+            });
+        }
+        
+        if (sendBtn) {
+            sendBtn.addEventListener('click', () => this.sendChatMessage());
+        }
+        
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => this.clearChat());
+        }
+    }
+    
+    async saveGeminiApiKey() {
+        const apiKeyInput = document.getElementById('gemini-api-key');
+        if (!apiKeyInput) return;
+        
+        const apiKey = apiKeyInput.value.trim();
+        if (!apiKey) {
+            this.showToast('APIキーを入力してください', 'warning');
+            return;
+        }
+        
+        if (this.geminiService) {
+            this.geminiService.setApiKey(apiKey);
+            this.showToast('APIキーを保存しました', 'success');
+        }
+    }
+    
+    async testGeminiConnection() {
+        if (!this.geminiService) {
+            this.showToast('Geminiサービスが利用できません', 'error');
+            return;
+        }
+        
+        const testBtn = document.getElementById('test-gemini-connection');
+        if (testBtn) {
+            testBtn.disabled = true;
+            testBtn.textContent = 'テスト中...';
+        }
+        
+        try {
+            await this.geminiService.testConnection();
+            this.showToast('接続テストに成功しました', 'success');
+        } catch (error) {
+            this.showToast(`接続テストに失敗: ${error.message}`, 'error');
+        } finally {
+            if (testBtn) {
+                testBtn.disabled = false;
+                testBtn.textContent = '接続テスト';
+            }
+        }
+    }
+    
+    async sendChatMessage() {
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-message');
+        
+        if (!chatInput || !this.geminiService) return;
+        
+        const message = chatInput.value.trim();
+        if (!message) return;
+        
+        // UIを無効化
+        chatInput.disabled = true;
+        if (sendBtn) sendBtn.disabled = true;
+        
+        try {
+            // ユーザーメッセージを表示
+            this.addChatMessage(message, 'user');
+            
+            // 入力フィールドをクリア
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+            
+            // タイピングインジケーター表示
+            this.showTypingIndicator();
+            
+            // APIに送信
+            const response = await this.geminiService.sendChatMessage(message);
+            
+            // タイピングインジケーター非表示
+            this.hideTypingIndicator();
+            
+            // AIの応答を表示
+            this.addChatMessage(response.response, 'ai');
+            
+            // 履歴を保存
+            this.saveChatHistory();
+            
+        } catch (error) {
+            this.hideTypingIndicator();
+            this.showToast(`メッセージ送信エラー: ${error.message}`, 'error');
+        } finally {
+            // UIを再有効化
+            chatInput.disabled = false;
+            if (sendBtn) sendBtn.disabled = false;
+        }
+    }
+    
+    addChatMessage(text, type) {
+        const messagesContainer = document.getElementById('chat-messages');
+        if (!messagesContainer) return;
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${type}-message`;
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.textContent = type === 'user' ? '👤' : '🤖';
+        
+        const content = document.createElement('div');
+        content.className = 'message-content';
+        
+        const messageText = document.createElement('div');
+        messageText.className = 'message-text';
+        messageText.textContent = text;
+        
+        const timestamp = document.createElement('div');
+        timestamp.className = 'message-time';
+        timestamp.textContent = new Date().toLocaleTimeString('ja-JP', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        content.appendChild(messageText);
+        content.appendChild(timestamp);
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(content);
+        
+        messagesContainer.appendChild(messageDiv);
+        
+        // スクロール
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // メッセージを配列に追加
+        this.chatMessages.push({
+            text: text,
+            type: type,
+            timestamp: new Date().toISOString()
+        });
+    }
+    
+    showTypingIndicator() {
+        const messagesContainer = document.getElementById('chat-messages');
+        if (!messagesContainer) return;
+        
+        const indicator = document.createElement('div');
+        indicator.className = 'chat-message ai-message typing-indicator';
+        indicator.id = 'typing-indicator';
+        
+        indicator.innerHTML = `
+            <div class="message-avatar">🤖</div>
+            <div class="message-content">
+                <div class="message-text">
+                    <span>AI が入力中</span>
+                    <div class="typing-dots">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        messagesContainer.appendChild(indicator);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    hideTypingIndicator() {
+        const indicator = document.getElementById('typing-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    }
+    
+    clearChat() {
+        const messagesContainer = document.getElementById('chat-messages');
+        if (!messagesContainer) return;
+        
+        // 最初のAIメッセージ以外を削除
+        const messages = messagesContainer.querySelectorAll('.chat-message');
+        messages.forEach((msg, index) => {
+            if (index > 0) msg.remove();
+        });
+        
+        // データをクリア
+        this.chatMessages = [];
+        if (this.geminiService) {
+            this.geminiService.clearChatHistory();
+        }
+        
+        this.saveChatHistory();
+        this.showToast('チャット履歴をクリアしました', 'success');
+    }
+    
+    saveChatHistory() {
+        localStorage.setItem('chat-history', JSON.stringify(this.chatMessages));
+    }
+    
+    loadChatHistory() {
+        try {
+            const history = localStorage.getItem('chat-history');
+            if (history) {
+                this.chatMessages = JSON.parse(history);
+                // UIは復元しない（新しいセッションとして開始）
+            }
+        } catch (error) {
+            console.warn('Failed to load chat history:', error);
+            this.chatMessages = [];
+        }
+    }
+
+    // === メディア解析機能 ===
+    initMediaAnalysis() {
+        console.log('Initializing media analysis...');
+        
+        // API設定
+        this.setupMediaApiSettings();
+        
+        // ファイルアップロード
+        this.setupFileUpload();
+        
+        // 既存のファイルプレビューをクリア
+        this.uploadedFiles = [];
+    }
+    
+    setupMediaApiSettings() {
+        const saveKeyBtn = document.getElementById('save-vision-key');
+        const testConnectionBtn = document.getElementById('test-vision-connection');
+        const toggleKeyBtn = document.getElementById('toggle-vision-key');
+        const apiKeyInput = document.getElementById('gemini-vision-api-key');
+        
+        if (saveKeyBtn) {
+            saveKeyBtn.addEventListener('click', () => this.saveVisionApiKey());
+        }
+        
+        if (testConnectionBtn) {
+            testConnectionBtn.addEventListener('click', () => this.testVisionConnection());
+        }
+        
+        if (toggleKeyBtn && apiKeyInput) {
+            toggleKeyBtn.addEventListener('click', () => {
+                const isPassword = apiKeyInput.type === 'password';
+                apiKeyInput.type = isPassword ? 'text' : 'password';
+                toggleKeyBtn.textContent = isPassword ? '🙈' : '👁️';
+            });
+        }
+        
+        // 既存のAPIキーを読み込み（チャットと同じキーを使用）
+        if (apiKeyInput && this.geminiService) {
+            apiKeyInput.value = this.geminiService.getApiKey();
+        }
+    }
+    
+    setupFileUpload() {
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const fileSelectBtn = document.getElementById('file-select-btn');
+        
+        if (uploadArea) {
+            // ドラッグ&ドロップ
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const files = Array.from(e.dataTransfer.files);
+                this.handleFileSelection(files);
+            });
+        }
+        
+        if (fileSelectBtn && fileInput) {
+            fileSelectBtn.addEventListener('click', () => fileInput.click());
+        }
+        
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => {
+                const files = Array.from(e.target.files);
+                this.handleFileSelection(files);
+            });
+        }
+    }
+    
+    handleFileSelection(files) {
+        files.forEach(file => {
+            if (this.validateFile(file)) {
+                this.addFileToPreview(file);
+            }
+        });
+    }
+    
+    validateFile(file) {
+        // ファイルサイズチェック（20MB）
+        const maxSize = 20 * 1024 * 1024;
+        if (file.size > maxSize) {
+            this.showToast(`ファイルサイズが大きすぎます: ${file.name}`, 'error');
+            return false;
+        }
+        
+        // ファイルタイプチェック
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm'];
+        if (!allowedTypes.includes(file.type)) {
+            this.showToast(`サポートされていないファイル形式: ${file.name}`, 'error');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    addFileToPreview(file) {
+        this.uploadedFiles.push(file);
+        
+        const preview = document.getElementById('file-preview');
+        const fileList = document.getElementById('file-list');
+        
+        if (!preview || !fileList) return;
+        
+        preview.classList.remove('hidden');
+        
+        const fileCard = document.createElement('div');
+        fileCard.className = 'file-card';
+        fileCard.dataset.fileName = file.name;
+        
+        // ファイルプレビュー作成
+        if (file.type.startsWith('image/')) {
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.onload = () => URL.revokeObjectURL(img.src);
+            fileCard.appendChild(img);
+        } else if (file.type.startsWith('video/')) {
+            const video = document.createElement('video');
+            video.src = URL.createObjectURL(file);
+            video.controls = false;
+            video.muted = true;
+            fileCard.appendChild(video);
+        }
+        
+        // ファイル情報
+        const fileName = document.createElement('div');
+        fileName.className = 'file-name';
+        fileName.textContent = file.name;
+        fileCard.appendChild(fileName);
+        
+        const fileSize = document.createElement('div');
+        fileSize.className = 'file-size';
+        fileSize.textContent = this.formatFileSize(file.size);
+        fileCard.appendChild(fileSize);
+        
+        // 操作ボタン
+        const actions = document.createElement('div');
+        actions.className = 'file-actions';
+        
+        const analyzeBtn = document.createElement('button');
+        analyzeBtn.className = 'btn-analyze';
+        analyzeBtn.textContent = '分析';
+        analyzeBtn.onclick = () => this.analyzeFile(file);
+        actions.appendChild(analyzeBtn);
+        
+        // 削除ボタン
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-btn';
+        removeBtn.textContent = '×';
+        removeBtn.onclick = () => this.removeFile(file.name);
+        fileCard.appendChild(removeBtn);
+        
+        fileCard.appendChild(actions);
+        fileList.appendChild(fileCard);
+    }
+    
+    async analyzeFile(file) {
+        if (!this.geminiService || !this.geminiService.isConfigured()) {
+            this.showToast('Gemini APIキーが設定されていません', 'warning');
+            return;
+        }
+        
+        try {
+            this.showLoading();
+            
+            let result;
+            if (file.type.startsWith('image/')) {
+                const imageData = await this.fileToBase64(file);
+                result = await this.geminiService.analyzeImage(imageData, file.name);
+            } else if (file.type.startsWith('video/')) {
+                result = await this.geminiService.analyzeVideo(file);
+            }
+            
+            this.displayAnalysisResult(result);
+            this.showToast('解析が完了しました', 'success');
+            
+        } catch (error) {
+            this.showToast(`解析エラー: ${error.message}`, 'error');
+        } finally {
+            this.hideLoading();
+        }
+    }
+    
+    displayAnalysisResult(result) {
+        const resultsContainer = document.getElementById('media-analysis-results');
+        const cardsContainer = document.getElementById('analysis-cards-container');
+        
+        if (!resultsContainer || !cardsContainer) return;
+        
+        resultsContainer.classList.remove('hidden');
+        
+        const card = document.createElement('div');
+        card.className = 'analysis-card';
+        
+        let cardHTML = `
+            <div class="analysis-header">
+                <div class="analysis-game">${result.gameTitle || 'ゲーム解析'}</div>
+                <div class="analysis-confidence">${result.timestamp || ''}</div>
+            </div>
+        `;
+        
+        if (result.overallScore) {
+            cardHTML += `
+                <div class="analysis-stats">
+                    <div class="stat-box">
+                        <div class="stat-label">総合評価</div>
+                        <div class="stat-value">${result.overallScore}</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (result.strengths && result.strengths.length > 0) {
+            cardHTML += `
+                <div class="analysis-section">
+                    <h4>✅ 良いポイント</h4>
+                    <ul class="analysis-list strengths">
+                        ${result.strengths.map(item => `<li>${item}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        if (result.weaknesses && result.weaknesses.length > 0) {
+            cardHTML += `
+                <div class="analysis-section">
+                    <h4>⚠️ 改善ポイント</h4>
+                    <ul class="analysis-list weaknesses">
+                        ${result.weaknesses.map(item => `<li>${item}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        if (result.suggestions && result.suggestions.length > 0) {
+            cardHTML += `
+                <div class="analysis-section">
+                    <h4>💡 改善提案</h4>
+                    <ul class="analysis-list suggestions">
+                        ${result.suggestions.map(item => `<li>${item}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        if (result.summary) {
+            cardHTML += `
+                <div class="analysis-section">
+                    <h4>📝 総合評価</h4>
+                    <p>${result.summary}</p>
+                </div>
+            `;
+        }
+        
+        card.innerHTML = cardHTML;
+        cardsContainer.appendChild(card);
+    }
+    
+    removeFile(fileName) {
+        // 配列から削除
+        this.uploadedFiles = this.uploadedFiles.filter(file => file.name !== fileName);
+        
+        // UIから削除
+        const fileCard = document.querySelector(`.file-card[data-file-name="${fileName}"]`);
+        if (fileCard) {
+            fileCard.remove();
+        }
+        
+        // プレビューエリアを非表示にする（ファイルがない場合）
+        if (this.uploadedFiles.length === 0) {
+            const preview = document.getElementById('file-preview');
+            if (preview) preview.classList.add('hidden');
+        }
+    }
+    
+    async saveVisionApiKey() {
+        const apiKeyInput = document.getElementById('gemini-vision-api-key');
+        if (!apiKeyInput) return;
+        
+        const apiKey = apiKeyInput.value.trim();
+        if (!apiKey) {
+            this.showToast('APIキーを入力してください', 'warning');
+            return;
+        }
+        
+        if (this.geminiService) {
+            this.geminiService.setApiKey(apiKey);
+            this.showToast('APIキーを保存しました', 'success');
+            
+            // チャット側のキーも同期
+            const chatKeyInput = document.getElementById('gemini-api-key');
+            if (chatKeyInput) {
+                chatKeyInput.value = apiKey;
+            }
+        }
+    }
+    
+    async testVisionConnection() {
+        return this.testGeminiConnection(); // チャット機能と同じテストを使用
+    }
+    
+    fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+    
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 }
 

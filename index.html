@@ -24,6 +24,10 @@
                         <span class="nav-icon">📈</span>
                         分析
                     </button>
+                    <button class="nav-btn" data-page="ai-chat">
+                        <span class="nav-icon">🤖</span>
+                        AIチャット
+                    </button>
                     <button class="nav-btn" data-page="goals">
                         <span class="nav-icon">🎯</span>
                         目標
@@ -176,6 +180,61 @@
                 </div>
             </div>
 
+            <!-- AI Chat Page -->
+            <div id="ai-chat" class="page">
+                <div class="page-header">
+                    <h2>🤖 AIチャット</h2>
+                    <p>Gemini AI とリアルタイムチャットしてゲームのアドバイスを受けよう</p>
+                </div>
+
+                <!-- API Settings -->
+                <div class="card">
+                    <h3>🔑 Gemini API設定</h3>
+                    <div class="form-group">
+                        <label for="gemini-api-key">APIキー</label>
+                        <div class="api-input-group">
+                            <input type="password" id="gemini-api-key" placeholder="Gemini APIキーを入力" autocomplete="off">
+                            <button type="button" class="toggle-btn" id="toggle-gemini-key" title="表示/非表示">
+                                👁️
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button id="save-gemini-key" class="btn-primary">保存</button>
+                        <button id="test-gemini-connection" class="btn-secondary">接続テスト</button>
+                    </div>
+                </div>
+
+                <!-- Chat Interface -->
+                <div class="card chat-container">
+                    <div class="chat-header">
+                        <h3>💬 チャット</h3>
+                        <button id="clear-chat" class="btn-secondary">履歴クリア</button>
+                    </div>
+                    
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="chat-message ai-message">
+                            <div class="message-avatar">🤖</div>
+                            <div class="message-content">
+                                <div class="message-text">
+                                    こんにちは！ゲーミングのパフォーマンス向上をお手伝いします。何でも聞いてください！
+                                </div>
+                                <div class="message-time">今</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-container">
+                        <div class="chat-input-wrapper">
+                            <textarea id="chat-input" placeholder="メッセージを入力..." rows="1"></textarea>
+                            <button id="send-message" class="send-btn" disabled>
+                                <span>📤</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Goals Page -->
             <div id="goals" class="page">
                 <div class="page-header">
@@ -215,100 +274,63 @@
             <!-- Media Analysis Page -->
             <div id="media-analysis" class="page">
                 <div class="page-header">
-                    <h2>スクリーンショット・動画分析</h2>
-                    <p>ゲーム画面や動画から自動でパフォーマンスを分析</p>
+                    <h2>📸 メディア解析</h2>
+                    <p>Gemini Vision AI でゲーム画面・動画を分析してパフォーマンスを向上させよう</p>
+                </div>
+
+                <!-- API Settings -->
+                <div class="card">
+                    <h3>🔑 Gemini Vision API設定</h3>
+                    <div class="form-group">
+                        <label for="gemini-vision-api-key">APIキー</label>
+                        <div class="api-input-group">
+                            <input type="password" id="gemini-vision-api-key" placeholder="Gemini APIキーを入力" autocomplete="off">
+                            <button type="button" class="toggle-btn" id="toggle-vision-key" title="表示/非表示">
+                                👁️
+                            </button>
+                        </div>
+                        <small class="api-note">※ 同じGemini APIキーで画像・動画解析が可能です</small>
+                    </div>
+                    <div class="form-actions">
+                        <button id="save-vision-key" class="btn-primary">保存</button>
+                        <button id="test-vision-connection" class="btn-secondary">接続テスト</button>
+                    </div>
                 </div>
 
                 <!-- Upload Area -->
                 <div class="card">
-                    <h3>ファイルアップロード</h3>
+                    <h3>📁 ファイルアップロード</h3>
                     <div class="upload-area" id="upload-area">
-                        <div class="upload-icon">📁</div>
-                        <p>スクリーンショットまたは動画をドラッグ＆ドロップ</p>
-                        <p class="upload-hint">または</p>
+                        <div class="upload-icon">🎮</div>
+                        <p><strong>ゲーム画面・動画をドラッグ＆ドロップ</strong></p>
+                        <p class="upload-hint">または下のボタンでファイル選択</p>
                         <button class="btn-secondary" id="file-select-btn">ファイルを選択</button>
                         <input type="file" id="file-input" accept="image/*,video/*" hidden multiple>
+                        <p class="upload-formats">対応形式: JPG, PNG, GIF, MP4, WebM (最大20MB)</p>
                     </div>
                     
                     <div id="file-preview" class="file-preview hidden">
-                        <!-- プレビューエリア -->
-                    </div>
-                </div>
-
-                <!-- Vision API Settings -->
-                <div class="card">
-                    <h3>画像・動画解析API設定</h3>
-                    <div class="api-grid">
-                        <div class="api-item">
-                            <label for="vision-api-key">Vision API キー</label>
-                            <div class="api-input-group">
-                                <input type="password" id="vision-api-key" placeholder="OpenAI Vision API キー">
-                                <button class="btn-secondary" id="test-vision-api">テスト</button>
-                            </div>
+                        <h4>📋 アップロードファイル</h4>
+                        <div id="file-list" class="file-grid">
+                            <!-- プレビューファイル -->
                         </div>
-                        <div class="api-item">
-                            <label for="video-api-key">Video Analysis API キー</label>
-                            <div class="api-input-group">
-                                <input type="password" id="video-api-key" placeholder="動画解析API キー">
-                                <button class="btn-secondary" id="test-video-api">テスト</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="api-actions">
-                        <button class="btn-primary" id="save-media-api-settings">設定を保存</button>
                     </div>
                 </div>
 
                 <!-- Analysis Results -->
                 <div id="media-analysis-results" class="analysis-results hidden">
-                    <!-- 分析結果がここに表示される -->
+                    <h3>🔍 解析結果</h3>
+                    <div id="analysis-cards-container">
+                        <!-- 解析結果カード -->
+                    </div>
                 </div>
             </div>
 
             <!-- Settings Page -->
             <div id="settings" class="page">
                 <div class="page-header">
-                    <h2>設定</h2>
-                    <p>AI API設定とアプリケーション設定</p>
-                </div>
-
-                <!-- API Configuration -->
-                <div class="card">
-                    <h3>AI API設定</h3>
-                    <div class="api-status" id="api-status">
-                        <span class="status-indicator offline">●</span>
-                        <span class="status-text">API未設定</span>
-                    </div>
-                    
-                    <form id="api-form" class="api-form">
-                        <div class="form-group">
-                            <label for="api-provider">APIプロバイダー</label>
-                            <select id="api-provider">
-                                <option value="openai">OpenAI</option>
-                                <option value="anthropic">Anthropic</option>
-                                <option value="gemini">Google Gemini</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="api-key">APIキー</label>
-                            <input type="password" id="api-key" placeholder="APIキーを入力してください">
-                            <button type="button" id="toggle-api-key" class="toggle-btn">👁️</button>
-                        </div>
-                        <div class="form-group">
-                            <label for="api-model">モデル</label>
-                            <select id="api-model">
-                                <option value="gpt-4">GPT-4</option>
-                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                                <option value="claude-3">Claude 3</option>
-                                <option value="gemini-pro">Gemini Pro</option>
-                            </select>
-                        </div>
-                        <div class="form-actions">
-                            <button type="button" id="test-api-btn" class="btn-secondary">接続テスト</button>
-                            <button type="submit" class="btn-primary">保存</button>
-                            <button type="button" id="clear-api-btn" class="btn-danger">クリア</button>
-                        </div>
-                    </form>
+                    <h2>⚙️ 設定</h2>
+                    <p>ゲーム選択とアプリケーション設定</p>
                 </div>
 
                 <!-- Game Selection -->
@@ -431,13 +453,26 @@
         </div>
     </div>
 
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loading" class="loading-overlay hidden">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>処理中...</p>
+        </div>
+    </div>
+
     <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="mock-data.js"></script>
     <script src="api-service.js"></script>
     <script src="auth-service.js"></script>
     <script src="game-categories.js"></script>
     <script src="media-analyzer.js"></script>
     <script src="theme-manager.js"></script>
+    <script src="gemini-service.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
