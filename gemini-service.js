@@ -1,11 +1,14 @@
 // gemini-service.js - Gemini API統合サービス
 class GeminiService {
     constructor() {
-        this.apiKey = localStorage.getItem('gemini-api-key') || '';
+        this.apiKey = '';
         this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-        this.chatModel = 'gemini-2.5-flash';
-        this.visionModel = 'gemini-2.5-pro';
+        this.chatModel = 'gemini-2.0-flash-exp';
+        this.visionModel = 'gemini-1.5-pro-vision';
         this.chatHistory = [];
+        
+        // 統一APIマネージャとの連携
+        this.initializeWithUnifiedAPI();
         
         // デフォルトパラメータ
         this.chatParams = {
@@ -23,19 +26,48 @@ class GeminiService {
         };
     }
 
-    // APIキー設定
+    // 統一APIマネージャとの連携初期化
+    initializeWithUnifiedAPI() {
+        if (window.unifiedApiManager) {
+            this.apiKey = window.unifiedApiManager.getAPIKey() || '';
+        }
+    }
+
+    // APIキー設定（統一APIマネージャ経由）
     setApiKey(apiKey) {
         this.apiKey = apiKey;
-        localStorage.setItem('gemini-api-key', apiKey);
+        if (window.unifiedApiManager) {
+            window.unifiedApiManager.setAPIKey(apiKey);
+        } else {
+            // フォールバック
+            localStorage.setItem('gemini-api-key', apiKey);
+        }
     }
 
     getApiKey() {
+        // 統一APIマネージャから取得を試行
+        if (window.unifiedApiManager && window.unifiedApiManager.isConfigured()) {
+            this.apiKey = window.unifiedApiManager.getAPIKey();
+        }
         return this.apiKey;
     }
 
     // APIキーが設定されているかチェック
     isConfigured() {
+        if (window.unifiedApiManager) {
+            return window.unifiedApiManager.isConfigured();
+        }
         return this.apiKey && this.apiKey.trim().length > 0;
+    }
+
+    // APIキーをクリア
+    clearApiKey() {
+        this.apiKey = '';
+        if (window.unifiedApiManager) {
+            window.unifiedApiManager.clearAPIKey();
+        } else {
+            localStorage.removeItem('gemini-api-key');
+        }
     }
 
     // 接続テスト
@@ -508,12 +540,6 @@ JSON形式で回答してください：
     // チャット履歴クリア
     clearChatHistory() {
         this.chatHistory = [];
-    }
-
-    // APIキークリア
-    clearApiKey() {
-        this.apiKey = '';
-        localStorage.removeItem('gemini-api-key');
     }
 }
 

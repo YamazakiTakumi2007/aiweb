@@ -52,17 +52,28 @@ class App {
         // ログインチェック
         this.checkAuthentication();
         
-        // イベントリスナーの設定
-        this.setupEventListeners();
+        // API設定チェックと初期化
+        this.checkAndInitializeAPI();
         
-        // ナビゲーションの初期化
-        this.initNavigation();
+        // APIキー初期設定が完了している場合のみ他の機能を初期化
+        this.continueInitialization();
         
-        // チャット機能の初期化
-        this.initChat();
+        // APIモーダル用のイベントリスナーを確実に設定
+        setTimeout(() => {
+            if (!window.apiModalListenersSet) {
+                this.setupInitialAPIModalListeners();
+            }
+        }, 500);
         
-        // メディア解析機能の初期化
-        this.initMediaAnalysis();
+        // ゲーム選択とダッシュボード機能の初期化
+        this.initGameSelection();
+        this.initDashboardGoals();
+        
+        // その他のナビゲーション機能
+        this.initNavigationHelpers();
+        
+        // AIコーチング機能の初期化
+        this.initAICoaching();
         
         // 初期ページの表示
         this.showPage(this.currentPage);
@@ -166,6 +177,341 @@ class App {
             userTypeIndicator.textContent = isGuest ? 'ゲスト' : 'ユーザー';
             userTypeIndicator.className = isGuest ? 'user-type guest' : 'user-type registered';
         }
+    }
+    
+    // API設定チェックと初期化
+    checkAndInitializeAPI() {
+        // 統一APIマネージャーの確認
+        if (!window.unifiedApiManager) {
+            console.error('統合APIマネージャーが利用できません');
+            return;
+        }
+        
+        // APIキー設定確認
+        const needsSetup = window.unifiedApiManager.needsInitialSetup();
+        
+        if (needsSetup) {
+            // モーダル表示前にログインモーダルを非表示
+            const loginModal = document.getElementById('login-modal');
+            if (loginModal) {
+                loginModal.classList.add('hidden');
+            }
+            
+            // APIキー初期設定モーダルを表示
+            setTimeout(() => {
+                this.showInitialAPISetupModal();
+            }, 100);
+        } else {
+            // 既存のAPIキー入力フィールドと統一APIマネージャーを同期
+            this.syncAPIKeyInputs();
+        }
+    }
+    
+    // 初期化の続行（APIキー設定後）
+    continueInitialization() {
+        // APIキー初期設定が必要な場合はスキップ
+        if (window.unifiedApiManager?.needsInitialSetup()) {
+            return;
+        }
+        
+        // イベントリスナーの設定
+        this.setupEventListeners();
+        
+        // ナビゲーションの初期化
+        this.initNavigation();
+        
+        // チャット機能の初期化
+        this.initChat();
+        
+        // メディア解析機能の初期化
+        this.initMediaAnalysis();
+    }
+    
+    // 初期APIセットアップモーダルを表示
+    showInitialAPISetupModal() {
+        const modal = document.getElementById('api-initial-setup-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex'; // 確実に表示
+            
+            // イベントリスナーを一度だけ設定
+            if (!window.apiModalListenersSet) {
+                setTimeout(() => this.setupInitialAPIModalListeners(), 300);
+            }
+            
+            // 入力フィールドの初期状態をチェック
+            setTimeout(() => {
+                const apiKeyInput = document.getElementById('initial-api-key');
+                if (apiKeyInput) {
+                    this.validateInitialAPIKeyInput(apiKeyInput.value.trim());
+                }
+            }, 400);
+        }
+    }
+    
+    // 初期APIセットアップモーダルのイベントリスナー設定
+    setupInitialAPIModalListeners() {
+        // 重複登録を防ぐ
+        if (window.apiModalListenersSet) {
+            return;
+        }
+        
+        // イベント委譲を使用してdocumentレベルでイベントをキャッチ
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'test-initial-api') {
+                e.preventDefault();
+                this.testInitialAPIConnection();
+            } else if (e.target.id === 'save-initial-api') {
+                e.preventDefault();
+                this.saveInitialAPIKeyFromModal();
+            } else if (e.target.id === 'skip-api-setup') {
+                e.preventDefault();
+                this.skipInitialAPISetup();
+            } else if (e.target.id === 'toggle-initial-key') {
+                e.preventDefault();
+                this.toggleInitialAPIKeyVisibility();
+            }
+        });
+        
+        // 入力フィールドのイベントも設定
+        const apiKeyInput = document.getElementById('initial-api-key');
+        if (apiKeyInput && !apiKeyInput.hasAttribute('data-listeners-added')) {
+            apiKeyInput.addEventListener('input', (e) => {
+                this.validateInitialAPIKeyInput(e.target.value.trim());
+            });
+            apiKeyInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    const saveBtn = document.getElementById('save-initial-api');
+                    if (saveBtn && !saveBtn.disabled) {
+                        this.saveInitialAPIKeyFromModal();
+                    }
+                }
+            });
+            apiKeyInput.setAttribute('data-listeners-added', 'true');
+        }
+        
+        // 重複設定防止フラグを設定
+        window.apiModalListenersSet = true;
+    }
+    
+    // APIキー表示/非表示切り替え
+    toggleInitialAPIKeyVisibility() {
+        const apiKeyInput = document.getElementById('initial-api-key');
+        const toggleBtn = document.getElementById('toggle-initial-key');
+        
+        if (apiKeyInput && toggleBtn) {
+            const isPassword = apiKeyInput.type === 'password';
+            apiKeyInput.type = isPassword ? 'text' : 'password';
+            toggleBtn.textContent = isPassword ? '🙈' : '👁️';
+        }
+    }
+    
+    // 初期APIキー入力の検証
+    validateInitialAPIKeyInput(apiKey) {
+        const testBtn = document.getElementById('test-initial-api');
+        const saveBtn = document.getElementById('save-initial-api');
+        
+        if (!window.unifiedApiManager) return;
+        
+        const validation = window.unifiedApiManager.validateAPIKeyStrength(apiKey);
+        const isValid = validation.valid;
+        
+        // ボタンの有効化/無効化
+        if (testBtn) testBtn.disabled = !isValid;
+        if (saveBtn) saveBtn.disabled = !isValid;
+        
+        // 視覚的フィードバック
+        const inputWrapper = document.querySelector('#initial-api-key').parentNode;
+        if (inputWrapper) {
+            inputWrapper.classList.remove('input-valid', 'input-invalid');
+            if (apiKey.length > 0) {
+                if (isValid) {
+                    inputWrapper.classList.add('input-valid');
+                } else {
+                    inputWrapper.classList.add('input-invalid');
+                }
+            }
+        }
+    }
+    
+    
+    
+    // 初期API接続テスト
+    async testInitialAPIConnection() {
+        const apiKeyInput = document.getElementById('initial-api-key');
+        const testBtn = document.getElementById('test-initial-api');
+        
+        if (!apiKeyInput) {
+            console.error('APIキー入力フィールドが見つかりません');
+            return;
+        }
+        
+        if (!window.unifiedApiManager) {
+            console.error('統一APIマネージャが利用できません');
+            this.showToast('APIマネージャが利用できません', 'error');
+            return;
+        }
+        
+        const apiKey = apiKeyInput.value;
+        if (!apiKey) {
+            this.showToast('APIキーを入力してください', 'warning');
+            return;
+        }
+        
+        // APIキーの強度チェック
+        const validation = window.unifiedApiManager.validateAPIKeyStrength(apiKey);
+        if (!validation.valid) {
+            this.showToast(`APIキーエラー: ${validation.issues[0]}`, 'error');
+            return;
+        }
+        
+        const originalText = testBtn.textContent;
+        testBtn.disabled = true;
+        testBtn.textContent = 'テスト中...';
+        
+        try {
+            // 一時的にAPIキーを設定
+            const originalApiKey = window.unifiedApiManager.getAPIKey();
+            await window.unifiedApiManager.setAPIKey(apiKey);
+            
+            // 接続テストを実行
+            await window.unifiedApiManager.validateAPIKey();
+            
+            this.showToast('接続テストに成功しました！', 'success');
+            
+            // テスト成功時に入力欄を緑色に
+            const inputWrapper = apiKeyInput.parentNode;
+            if (inputWrapper) {
+                inputWrapper.classList.remove('input-invalid');
+                inputWrapper.classList.add('input-valid');
+            }
+            
+            // 元のAPIキーを復元（テストだけなので）
+            if (originalApiKey) {
+                await window.unifiedApiManager.setAPIKey(originalApiKey);
+            } else {
+                window.unifiedApiManager.clearAPIKey();
+            }
+            
+        } catch (error) {
+            console.error('API接続テストに失敗:', error);
+            this.showToast(`接続テストに失敗しました: ${error.message}`, 'error');
+            
+            // テスト失敗時に入力欄を赤色に
+            const inputWrapper = apiKeyInput.parentNode;
+            if (inputWrapper) {
+                inputWrapper.classList.remove('input-valid');
+                inputWrapper.classList.add('input-invalid');
+            }
+        } finally {
+            testBtn.disabled = false;
+            testBtn.textContent = originalText;
+        }
+    }
+    
+    // 初期モーダルからAPIキーを保存
+    async saveInitialAPIKeyFromModal() {
+        const apiKeyInput = document.getElementById('initial-api-key');
+        const saveBtn = document.getElementById('save-initial-api');
+        
+        if (!apiKeyInput) {
+            console.error('APIキー入力フィールドが見つかりません');
+            return;
+        }
+        
+        if (!window.unifiedApiManager) {
+            console.error('統合APIマネージャーが利用できません');
+            this.showToast('APIマネージャーが利用できません', 'error');
+            return;
+        }
+        
+        const apiKey = apiKeyInput.value.trim();
+        if (!apiKey) {
+            this.showToast('APIキーを入力してください', 'warning');
+            return;
+        }
+        
+        // APIキーの形式チェック
+        const validation = window.unifiedApiManager.validateAPIKeyStrength(apiKey);
+        if (!validation.valid) {
+            this.showToast(`APIキーが無効です: ${validation.issues.join(', ')}`, 'error');
+            return;
+        }
+        
+        const originalText = saveBtn.textContent;
+        saveBtn.disabled = true;
+        saveBtn.textContent = '保存中...';
+        
+        try {
+            // APIキーを統合マネージャーに保存
+            window.unifiedApiManager.setAPIKey(apiKey);
+            
+            // 既存の入力フィールドも同期
+            this.syncAPIKeyInputs();
+            
+            this.showToast('APIキーを保存しました', 'success');
+            this.closeInitialAPISetupModal();
+            
+            // APIキー設定完了後、残りの初期化を実行してからログイン画面を表示
+            setTimeout(() => {
+                this.continueInitialization();
+                this.showLoginModal();
+            }, 500);
+            
+        } catch (error) {
+            console.error('APIキー保存に失敗:', error);
+            this.showToast(`保存に失敗しました: ${error.message}`, 'error');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
+    }
+    
+    // 初期APIセットアップをスキップ
+    skipInitialAPISetup() {
+        this.showToast('API設定をスキップしました。一部機能が制限されます。', 'info');
+        this.closeInitialAPISetupModal();
+        
+        // スキップ後も残りの初期化を実行してからログイン画面を表示
+        setTimeout(() => {
+            this.continueInitialization();
+            this.showLoginModal();
+        }, 500);
+    }
+    
+    // 初期APIセットアップモーダルを閉じる
+    closeInitialAPISetupModal() {
+        const modal = document.getElementById('api-initial-setup-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.style.display = 'none'; // 確実に非表示にする
+        }
+    }
+    
+    // APIセットアップモーダルを閉じる
+    closeAPISetupModal() {
+        const modal = document.getElementById('api-setup-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+    
+    // APIキー入力フィールドの同期
+    syncAPIKeyInputs() {
+        if (!window.unifiedApiManager) return;
+        
+        const apiKey = window.unifiedApiManager.getAPIKey();
+        const inputs = [
+            document.getElementById('gemini-api-key'),
+            document.getElementById('gemini-vision-api-key'),
+            document.getElementById('initial-api-key')
+        ];
+        
+        inputs.forEach(input => {
+            if (input && apiKey) {
+                input.value = apiKey;
+            }
+        });
     }
     
     // ナビゲーション
@@ -793,15 +1139,21 @@ class App {
         
         let html = '';
         for (const [categoryKey, category] of Object.entries(ESPORTS_GAMES)) {
-            html += `<div class="category-section">
-                <h4>${category.name}</h4>
+            html += `<div class="game-category-section">
+                <h4 class="category-title">${category.name}</h4>
                 <div class="games-grid">`;
             
             category.games.forEach(game => {
                 html += `
-                    <div class="game-card" data-game-id="${game.id}">
-                        <span class="game-icon">${game.icon}</span>
-                        <span class="game-name">${game.name}</span>
+                    <div class="game-option" 
+                         data-game-id="${game.id}" 
+                         data-game-name="${game.name}" 
+                         data-game-icon="${game.icon}" 
+                         data-category="${category.name}"
+                         role="button"
+                         tabindex="0">
+                        <span class="game-option-icon">${game.icon}</span>
+                        <span class="game-option-name">${game.name}</span>
                     </div>`;
             });
             
@@ -810,13 +1162,8 @@ class App {
         
         container.innerHTML = html;
         
-        // ゲームカードのクリックイベント
-        container.querySelectorAll('.game-card').forEach(card => {
-            card.addEventListener('click', () => {
-                container.querySelectorAll('.game-card').forEach(c => c.classList.remove('selected'));
-                card.classList.add('selected');
-            });
-        });
+        // ゲーム選択カードのクリックイベントを設定
+        this.setupGameCards();
     }
     
     showGameSelector() {
@@ -959,9 +1306,22 @@ class App {
             return;
         }
         
-        if (this.geminiService) {
-            this.geminiService.setApiKey(apiKey);
-            this.showToast('APIキーを保存しました', 'success');
+        try {
+            // 統一APIマネージャーを使用
+            if (window.unifiedApiManager) {
+                await window.unifiedApiManager.setAPIKey(apiKey);
+                // 他の入力フィールドも同期
+                this.syncAPIKeyInputs();
+                this.showToast('APIキーを保存しました', 'success');
+            } else if (this.geminiService) {
+                // フォールバック
+                this.geminiService.setApiKey(apiKey);
+                this.showToast('Gemini APIキーを保存しました', 'success');
+            } else {
+                this.showToast('APIサービスが初期化されていません', 'error');
+            }
+        } catch (error) {
+            this.showToast(`APIキー保存に失敗しました: ${error.message}`, 'error');
         }
     }
     
@@ -1474,6 +1834,766 @@ class App {
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // === ゲーム選択とダッシュボード機能 ===
+    initGameSelection() {
+        console.log('Initializing game selection...');
+        
+        // ゲーム選択誘導ボタン
+        const gotoGameSelectionBtn = document.getElementById('goto-game-selection');
+        if (gotoGameSelectionBtn) {
+            gotoGameSelectionBtn.addEventListener('click', () => {
+                this.goToGameSelection();
+            });
+        }
+        
+        // ゲームカードのクリックイベントを設定
+        this.setupGameActionButtons();
+        
+        // 初期状態のチェック
+        this.checkGameSelection();
+    }
+    
+    setupGameCardEvents() {
+        // ゲームカードの初回設定
+        this.setupGameCards();
+        
+        // ゲームカードが動的生成される場合のための再試行機構
+        setTimeout(() => this.setupGameCards(), 500);
+        setTimeout(() => this.setupGameCards(), 1500);
+        
+        // 確認・キャンセルボタンの設定
+        this.setupGameActionButtons();
+    }
+    
+    setupGameCards() {
+        const gameCards = document.querySelectorAll('.game-option');
+        console.log(`Found ${gameCards.length} game cards`);
+        
+        gameCards.forEach((card) => {
+            // クリックイベントリスナー追加
+            card.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Game card clicked:', card.dataset.gameName);
+                this.selectGame(card);
+            });
+            
+            // キーボードアクセシビリティ
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this.selectGame(card);
+                }
+            });
+            
+            // マウスオーバー効果
+            card.addEventListener('mouseenter', () => {
+                if (!card.classList.contains('selected')) {
+                    card.style.transform = 'scale(1.02)';
+                }
+            });
+            
+            card.addEventListener('mouseleave', () => {
+                if (!card.classList.contains('selected')) {
+                    card.style.transform = 'scale(1)';
+                }
+            });
+            
+            // クリック可能であることを明示するスタイル
+            card.style.cursor = 'pointer';
+        });
+        
+        // 現在選択されているゲームがあれば表示
+        this.restoreGameSelection();
+    }
+    
+    setupGameActionButtons() {
+        const confirmBtn = document.getElementById('confirm-game-btn');
+        const cancelBtn = document.getElementById('cancel-game-btn');
+        
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => this.confirmGameSelection());
+        }
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => this.hideGameSelector());
+        }
+    }
+    
+    generateGameId(gameName) {
+        // 日本語ゲーム名を英語IDに変換
+        const gameIdMap = {
+            'League of Legends': 'lol',
+            'Valorant': 'valorant',
+            'Overwatch 2': 'overwatch2',
+            'Counter-Strike 2': 'cs2',
+            'Apex Legends': 'apex',
+            'Fortnite': 'fortnite',
+            'Call of Duty': 'cod',
+            'Rainbow Six Siege': 'r6',
+            'Rocket League': 'rocketleague',
+            'FIFA 24': 'fifa24',
+            'NBA 2K24': 'nba2k24',
+            'Gran Turismo 7': 'gt7'
+        };
+        
+        return gameIdMap[gameName] || gameName.toLowerCase().replace(/\s+/g, '_');
+    }
+    
+    restoreGameSelection() {
+        const selectedGameId = localStorage.getItem('selectedGame');
+        if (selectedGameId) {
+            const selectedCard = document.querySelector(`.game-option[data-game-id="${selectedGameId}"]`);
+            if (selectedCard) {
+                selectedCard.classList.add('selected');
+            }
+        }
+    }
+    
+    goToGameSelection() {
+        // 設定タブに移動
+        this.showPage('settings');
+        
+        // ナビゲーションのアクティブ状態を更新
+        const navBtns = document.querySelectorAll('.nav-btn');
+        navBtns.forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.page === 'settings') {
+                btn.classList.add('active');
+            }
+        });
+        
+        // ゲーム選択エリアまでスクロール
+        setTimeout(() => {
+            const gameSelection = document.getElementById('current-game-display');
+            if (gameSelection) {
+                gameSelection.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center' 
+                });
+            }
+            
+            // ゲーム選択を開く
+            this.showGameSelector();
+            
+            // ハイライトアニメーション
+            const gameSelector = document.getElementById('game-selector');
+            if (gameSelector) {
+                gameSelector.classList.add('highlight');
+                setTimeout(() => {
+                    gameSelector.classList.remove('highlight');
+                }, 1500);
+            }
+        }, 300);
+    }
+    
+    checkGameSelection() {
+        const selectedGame = localStorage.getItem('selectedGame');
+        const selectedGameData = localStorage.getItem('selectedGameData');
+        
+        if (selectedGame && selectedGameData) {
+            // ゲームが選択済み
+            this.updateUIWithGameData(JSON.parse(selectedGameData));
+            this.hideGameSelectionGuidance();
+        } else {
+            // ゲーム未選択
+            this.showGameSelectionGuidance();
+            this.clearGameData();
+        }
+    }
+    
+    selectGame(gameCard) {
+        // 他のカードの選択を解除
+        const allCards = document.querySelectorAll('.game-option');
+        allCards.forEach(card => card.classList.remove('selected'));
+        
+        // 選択したカードをハイライト
+        gameCard.classList.add('selected');
+    }
+    
+    confirmGameSelection() {
+        const selectedCard = document.querySelector('.game-option.selected');
+        if (!selectedCard) {
+            this.showToast('ゲームを選択してください', 'warning');
+            return;
+        }
+        
+        // ゲーム情報を取得
+        const gameId = selectedCard.dataset.gameId;
+        const gameName = selectedCard.dataset.gameName || selectedCard.querySelector('.game-option-name').textContent;
+        const gameIcon = selectedCard.dataset.gameIcon || selectedCard.querySelector('.game-option-icon').textContent;
+        const categoryName = selectedCard.dataset.category || selectedCard.closest('.game-category-section')?.querySelector('.category-title')?.textContent || 'その他';
+        
+        const gameData = {
+            id: gameId,
+            name: gameName,
+            icon: gameIcon,
+            category: categoryName
+        };
+        
+        // LocalStorageに保存
+        localStorage.setItem('selectedGame', gameId);
+        localStorage.setItem('selectedGameData', JSON.stringify(gameData));
+        
+        // UIを更新
+        this.updateUIWithGameData(gameData);
+        this.hideGameSelector();
+        this.hideGameSelectionGuidance();
+        
+        this.showToast(`${gameName} を選択しました`, 'success');
+        
+        // ダッシュボードに戻る
+        setTimeout(() => {
+            this.showPage('dashboard');
+            const navBtns = document.querySelectorAll('.nav-btn');
+            navBtns.forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.page === 'dashboard') {
+                    btn.classList.add('active');
+                }
+            });
+        }, 1000);
+    }
+    
+    updateUIWithGameData(gameData) {
+        // ダッシュボード更新
+        const playerGame = document.getElementById('player-game');
+        const currentGameName = document.getElementById('current-game-name');
+        const currentGameIcon = document.getElementById('current-game-icon');
+        const currentGameCategory = document.getElementById('current-game-category');
+        
+        if (playerGame) playerGame.textContent = gameData.name;
+        if (currentGameName) currentGameName.textContent = gameData.name;
+        if (currentGameIcon) currentGameIcon.textContent = gameData.icon;
+        if (currentGameCategory) currentGameCategory.textContent = gameData.category;
+        
+        // サンプルデータを表示
+        this.loadSampleGameData(gameData);
+    }
+    
+    loadSampleGameData(gameData) {
+        // プレイヤー名をカスタマイズ
+        const playerName = document.getElementById('player-name');
+        if (playerName) {
+            playerName.textContent = `${gameData.name} プレイヤー`;
+        }
+        
+        // ランクを設定
+        const playerRank = document.getElementById('player-rank');
+        if (playerRank) {
+            const ranks = {
+                'League of Legends': 'Gold II',
+                'Valorant': 'Diamond I',
+                'Overwatch 2': 'Platinum III',
+                'Counter-Strike 2': 'Global Elite',
+                'Apex Legends': 'Diamond IV'
+            };
+            playerRank.textContent = ranks[gameData.name] || 'Platinum II';
+        }
+        
+        // 統計データをサンプル値で更新
+        const stats = {
+            'win-rate': this.generateRandomStat(45, 75, '%'),
+            'avg-kda': this.generateRandomStat(1.2, 3.5, '', 1),
+            'cs-per-min': this.generateRandomStat(5.5, 8.5, '', 1),
+            'games-played': Math.floor(Math.random() * 300) + 50
+        };
+        
+        Object.entries(stats).forEach(([id, value]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value;
+            }
+        });
+    }
+    
+    generateRandomStat(min, max, suffix = '', decimals = 0) {
+        const value = Math.random() * (max - min) + min;
+        return decimals > 0 ? value.toFixed(decimals) + suffix : Math.floor(value) + suffix;
+    }
+    
+    clearGameData() {
+        const playerGame = document.getElementById('player-game');
+        const currentGameName = document.getElementById('current-game-name');
+        
+        if (playerGame) playerGame.textContent = 'ゲーム未選択';
+        if (currentGameName) currentGameName.textContent = 'ゲームを選択してください';
+        
+        // 統計を「-」に戻す
+        ['win-rate', 'avg-kda', 'cs-per-min', 'games-played'].forEach(id => {
+            const element = document.getElementById(id);
+            if (element) element.textContent = '-';
+        });
+    }
+    
+    showGameSelectionGuidance() {
+        const guidance = document.getElementById('game-selection-guidance');
+        if (guidance) {
+            guidance.classList.remove('hidden');
+        }
+    }
+    
+    hideGameSelectionGuidance() {
+        const guidance = document.getElementById('game-selection-guidance');
+        if (guidance) {
+            guidance.classList.add('hidden');
+        }
+    }
+
+    // === ダッシュボード目標表示機能 ===
+    initDashboardGoals() {
+        console.log('Initializing dashboard goals...');
+        
+        // イベントリスナー設定
+        const viewAllGoalsBtn = document.getElementById('view-all-goals');
+        const addFirstGoalBtn = document.getElementById('add-first-goal');
+        
+        if (viewAllGoalsBtn) {
+            viewAllGoalsBtn.addEventListener('click', () => {
+                this.showPage('goals');
+                this.updateNavigation('goals');
+            });
+        }
+        
+        if (addFirstGoalBtn) {
+            addFirstGoalBtn.addEventListener('click', () => {
+                this.showPage('goals');
+                this.updateNavigation('goals');
+            });
+        }
+        
+        // 目標データを読み込み
+        this.loadDashboardGoals();
+        
+        // LocalStorageの変更を監視
+        this.setupGoalsStorageListener();
+    }
+    
+    loadDashboardGoals() {
+        try {
+            const goalsData = localStorage.getItem('goals');
+            const goals = goalsData ? JSON.parse(goalsData) : [];
+            
+            this.renderDashboardGoals(goals);
+        } catch (error) {
+            console.warn('Failed to load goals:', error);
+            this.renderDashboardGoals([]);
+        }
+    }
+    
+    renderDashboardGoals(goals) {
+        const goalsList = document.getElementById('dashboard-goals-list');
+        if (!goalsList) return;
+        
+        if (goals.length === 0) {
+            // 目標なし
+            goalsList.innerHTML = `
+                <div class="no-goals-message">
+                    <h4>目標が設定されていません</h4>
+                    <p>パフォーマンス向上のための目標を設定しましょう</p>
+                    <button class="add-goal-btn" id="add-first-goal">最初の目標を追加</button>
+                </div>
+            `;
+            
+            // イベントリスナー再設定
+            const addFirstGoalBtn = document.getElementById('add-first-goal');
+            if (addFirstGoalBtn) {
+                addFirstGoalBtn.addEventListener('click', () => {
+                    this.showPage('goals');
+                    this.updateNavigation('goals');
+                });
+            }
+            
+            return;
+        }
+        
+        // 目標をソート（期限が近い順、進捗が低い順）
+        const sortedGoals = goals.sort((a, b) => {
+            const dateA = new Date(a.deadline);
+            const dateB = new Date(b.deadline);
+            const progressA = a.progress || 0;
+            const progressB = b.progress || 0;
+            
+            // 期限が近い順
+            if (dateA !== dateB) {
+                return dateA - dateB;
+            }
+            
+            // 進捗が低い順
+            return progressA - progressB;
+        });
+        
+        // 最大3件表示
+        const displayGoals = sortedGoals.slice(0, 3);
+        
+        goalsList.innerHTML = displayGoals.map(goal => this.renderGoalItem(goal)).join('');
+    }
+    
+    renderGoalItem(goal) {
+        const progress = goal.progress || 0;
+        const deadline = new Date(goal.deadline).toLocaleDateString('ja-JP');
+        const isUrgent = this.isDeadlineUrgent(goal.deadline);
+        const urgentClass = isUrgent ? 'urgent' : '';
+        
+        return `
+            <div class="dashboard-goal-item ${urgentClass}">
+                <div class="goal-item-header">
+                    <h5 class="goal-item-title">${goal.title}</h5>
+                    <span class="goal-item-deadline">〜 ${deadline}</span>
+                </div>
+                <div class="goal-progress-container">
+                    <div class="goal-progress-bar">
+                        <div class="goal-progress-fill" style="width: ${progress}%"></div>
+                    </div>
+                    <div class="goal-progress-text">${progress}%</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    isDeadlineUrgent(deadline) {
+        const now = new Date();
+        const deadlineDate = new Date(deadline);
+        const diffDays = (deadlineDate - now) / (1000 * 60 * 60 * 24);
+        return diffDays <= 7; // 7日以内は緊急
+    }
+    
+    setupGoalsStorageListener() {
+        // LocalStorageの変更を監視
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'goals') {
+                this.loadDashboardGoals();
+            }
+        });
+        
+        // 同一タブ内での変更も監視
+        const originalSetItem = localStorage.setItem;
+        localStorage.setItem = (key, value) => {
+            originalSetItem.call(localStorage, key, value);
+            if (key === 'goals') {
+                setTimeout(() => this.loadDashboardGoals(), 100);
+            }
+        };
+    }
+    
+    updateNavigation(pageId) {
+        const navBtns = document.querySelectorAll('.nav-btn');
+        navBtns.forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.page === pageId) {
+                btn.classList.add('active');
+            }
+        });
+    }
+
+    // === ナビゲーション支援機能 ===
+    initNavigationHelpers() {
+        // 分析タブへのナビゲーションボタン
+        const gotoAnalysisBtn = document.getElementById('goto-analysis');
+        if (gotoAnalysisBtn) {
+            gotoAnalysisBtn.addEventListener('click', () => {
+                this.showPage('analysis');
+                this.updateNavigation('analysis');
+            });
+        }
+        
+        // AI用目標設定ボタン
+        const gotoGoalsForAIBtn = document.getElementById('goto-goals-for-ai');
+        if (gotoGoalsForAIBtn) {
+            gotoGoalsForAIBtn.addEventListener('click', () => {
+                this.showPage('goals');
+                this.updateNavigation('goals');
+            });
+        }
+    }
+
+    // === AIコーチング機能 ===
+    initAICoaching() {
+        console.log('Initializing AI coaching...');
+        
+        // リフレッシュボタンのイベントリスナー
+        const refreshCoachingBtn = document.getElementById('refresh-coaching');
+        if (refreshCoachingBtn) {
+            refreshCoachingBtn.addEventListener('click', () => {
+                this.generateAIRecommendations();
+            });
+        }
+        
+        // 初期のAI推奨事項をロード
+        this.loadAIRecommendations();
+        
+        // 目標の変更を監視してAI推奨事項を更新
+        this.setupAICoachingGoalsListener();
+    }
+    
+    loadAIRecommendations() {
+        try {
+            const goalsData = localStorage.getItem('goals');
+            const goals = goalsData ? JSON.parse(goalsData) : [];
+            
+            if (goals.length === 0) {
+                this.showNoRecommendationsMessage();
+            } else {
+                this.generateAIRecommendations();
+            }
+        } catch (error) {
+            console.warn('Failed to load AI recommendations:', error);
+            this.showNoRecommendationsMessage();
+        }
+    }
+    
+    showNoRecommendationsMessage() {
+        const recommendationsContent = document.getElementById('ai-recommendations-content');
+        if (recommendationsContent) {
+            recommendationsContent.innerHTML = `
+                <div class="no-recommendations-message">
+                    <p class="message-text">目標を設定してパーソナライズされたアドバイスを受け取りましょう</p>
+                    <button class="btn-secondary" id="goto-goals-for-ai">
+                        目標を設定する
+                    </button>
+                </div>
+            `;
+            
+            // ボタンのイベントリスナー再設定
+            const gotoGoalsBtn = document.getElementById('goto-goals-for-ai');
+            if (gotoGoalsBtn) {
+                gotoGoalsBtn.addEventListener('click', () => {
+                    this.showPage('goals');
+                    this.updateNavigation('goals');
+                });
+            }
+        }
+    }
+    
+    async generateAIRecommendations() {
+        const refreshBtn = document.getElementById('refresh-coaching');
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '⏳';
+        }
+        
+        try {
+            const goals = JSON.parse(localStorage.getItem('goals') || '[]');
+            const selectedGameData = JSON.parse(localStorage.getItem('selectedGameData') || '{}');
+            
+            if (goals.length === 0) {
+                this.showNoRecommendationsMessage();
+                return;
+            }
+            
+            // Gemini APIが利用可能かチェック
+            if (!this.geminiService || !this.geminiService.isConfigured()) {
+                this.showOfflineRecommendations(goals, selectedGameData);
+                return;
+            }
+            
+            // 最も優先度の高い目標を選択（期限が近い、進捗が低い）
+            const priorityGoal = this.selectPriorityGoal(goals);
+            
+            // Gemini AIからアドバイスを取得
+            const prompt = this.generateCoachingPrompt(priorityGoal, selectedGameData);
+            const response = await this.geminiService.sendChatMessage(prompt, false);
+            
+            this.renderAIRecommendations(response.response, priorityGoal);
+            
+        } catch (error) {
+            console.warn('AI recommendations generation failed:', error);
+            
+            // フォールバック: オフライン推奨事項
+            const goals = JSON.parse(localStorage.getItem('goals') || '[]');
+            const selectedGameData = JSON.parse(localStorage.getItem('selectedGameData') || '{}');
+            this.showOfflineRecommendations(goals, selectedGameData);
+        } finally {
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '🔄';
+            }
+        }
+    }
+    
+    selectPriorityGoal(goals) {
+        // 期限が近い順、進捗が低い順でソート
+        return goals.sort((a, b) => {
+            const dateA = new Date(a.deadline);
+            const dateB = new Date(b.deadline);
+            const progressA = a.progress || 0;
+            const progressB = b.progress || 0;
+            
+            // 期限が近い順
+            if (Math.abs(dateA - dateB) > 24 * 60 * 60 * 1000) {
+                return dateA - dateB;
+            }
+            
+            // 進捗が低い順
+            return progressA - progressB;
+        })[0];
+    }
+    
+    generateCoachingPrompt(goal, gameData) {
+        const gameName = gameData.name || 'eSports';
+        const progress = goal.progress || 0;
+        const deadline = new Date(goal.deadline).toLocaleDateString('ja-JP');
+        
+        return `あなたはeSportsコーチングの専門家です。
+以下の目標に対して、具体的で実践的なアドバイスを提供してください。
+
+ゲーム: ${gameName}
+目標: ${goal.title}
+期限: ${deadline}
+現在の進捗: ${progress}%
+
+以下の形式で日本語で簡潔に回答してください：
+1. 具体的な行動指針（50文字以内）
+2. なぜそれが効果的か（100文字以内）
+3. 今日実践できること（50文字以内）`;
+    }
+    
+    renderAIRecommendations(aiResponse, goal) {
+        const recommendationsContent = document.getElementById('ai-recommendations-content');
+        if (!recommendationsContent) return;
+        
+        // AIレスポンスを解析
+        const lines = aiResponse.split('\n').filter(line => line.trim());
+        let actionPlan = '';
+        let effectiveness = '';
+        let todayAction = '';
+        
+        lines.forEach(line => {
+            if (line.includes('1.') || line.includes('行動指針')) {
+                actionPlan = line.replace(/^[1.]?\s*/, '').replace(/行動指針[：:]?\s*/, '');
+            } else if (line.includes('2.') || line.includes('効果的')) {
+                effectiveness = line.replace(/^[2.]?\s*/, '').replace(/効果的.*?[：:]?\s*/, '');
+            } else if (line.includes('3.') || line.includes('今日')) {
+                todayAction = line.replace(/^[3.]?\s*/, '').replace(/今日.*?[：:]?\s*/, '');
+            }
+        });
+        
+        // デフォルト値を設定
+        if (!actionPlan) actionPlan = aiResponse.substring(0, 100) + '...';
+        if (!effectiveness) effectiveness = 'コーチング理論に基づく効果的なアプローチです';
+        if (!todayAction) todayAction = '練習を始めてみましょう';
+        
+        recommendationsContent.innerHTML = `
+            <div class="coaching-advice-card">
+                <div class="advice-header">
+                    <div class="goal-focus">
+                        <span class="goal-icon">🎯</span>
+                        <span class="goal-title">目標: ${goal.title}</span>
+                    </div>
+                    <div class="goal-deadline">期限: ${new Date(goal.deadline).toLocaleDateString('ja-JP')}</div>
+                </div>
+                
+                <div class="advice-content">
+                    <div class="advice-item">
+                        <h4>💡 行動指針</h4>
+                        <p>${actionPlan}</p>
+                    </div>
+                    
+                    <div class="advice-item">
+                        <h4>🔍 効果の理由</h4>
+                        <p>${effectiveness}</p>
+                    </div>
+                    
+                    <div class="advice-item today-action">
+                        <h4>⚡ 今日やること</h4>
+                        <p>${todayAction}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    showOfflineRecommendations(goals, gameData) {
+        if (goals.length === 0) {
+            this.showNoRecommendationsMessage();
+            return;
+        }
+        
+        const priorityGoal = this.selectPriorityGoal(goals);
+        const gameName = gameData.name || 'eSports';
+        
+        // ゲーム固有のオフライン推奨事項
+        const offlineAdvice = this.getOfflineAdvice(priorityGoal, gameName);
+        
+        const recommendationsContent = document.getElementById('ai-recommendations-content');
+        if (recommendationsContent) {
+            recommendationsContent.innerHTML = `
+                <div class="coaching-advice-card offline">
+                    <div class="advice-header">
+                        <div class="goal-focus">
+                            <span class="goal-icon">🎯</span>
+                            <span class="goal-title">目標: ${priorityGoal.title}</span>
+                        </div>
+                        <div class="offline-indicator">オフラインモード</div>
+                    </div>
+                    
+                    <div class="advice-content">
+                        <div class="advice-item">
+                            <h4>💡 行動指針</h4>
+                            <p>${offlineAdvice.actionPlan}</p>
+                        </div>
+                        
+                        <div class="advice-item">
+                            <h4>🔍 効果の理由</h4>
+                            <p>${offlineAdvice.effectiveness}</p>
+                        </div>
+                        
+                        <div class="advice-item today-action">
+                            <h4>⚡ 今日やること</h4>
+                            <p>${offlineAdvice.todayAction}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="api-setup-suggestion">
+                        <p>さらに詳細なアドバイスを受けるにはGemini APIを設定してください</p>
+                        <button class="btn-secondary" id="goto-api-setup">API設定</button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+    
+    getOfflineAdvice(goal, gameName) {
+        // ゲーム固有の基本的なアドバイスを提供
+        const gameSpecificAdvice = {
+            'League of Legends': {
+                actionPlan: 'CSを意識してファームを安定させ、ワードで視界をコントロールしましょう',
+                effectiveness: 'ゲームの基礎であるファームと視界は勝率向上に直結します',
+                todayAction: 'カスタムゲームで10分間のCSハードキャップ練習'
+            },
+            'Valorant': {
+                actionPlan: 'クロスヘア配置とプリエイムを意識して正確性を向上させましょう',
+                effectiveness: '正確なエイムは直接的にキル数と勝率の向上につながります',
+                todayAction: 'エイム練習場で15分間フリックとトラッキング練習'
+            },
+            'Overwatch 2': {
+                actionPlan: 'ロール理解を深め、チーム連携とポジショニングを改善しましょう',
+                effectiveness: 'チーム戦が重要なゲームでは個人技より連携が勝敗を決めます',
+                todayAction: '自分のロールの責任を整理し、コミュニケーションを意識した試合を3戦'
+            }
+        };
+        
+        return gameSpecificAdvice[gameName] || {
+            actionPlan: '基礎練習を継続し、試合の振り返りを定期的に行いましょう',
+            effectiveness: '継続的な改善サイクルがスキル向上の鍵です',
+            todayAction: '今日の試合を1回録画して後で見返す準備'
+        };
+    }
+    
+    setupAICoachingGoalsListener() {
+        // LocalStorageの目標変更を監視してAI推奨事項を更新
+        const originalSetItem = localStorage.setItem;
+        localStorage.setItem = function(key, value) {
+            originalSetItem.call(localStorage, key, value);
+            if (key === 'goals') {
+                setTimeout(() => {
+                    if (window.app && window.app.loadAIRecommendations) {
+                        window.app.loadAIRecommendations();
+                    }
+                }, 200);
+            }
+        };
     }
 }
 

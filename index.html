@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>eSports AI コーチング</title>
+    <title>e-Bridge - eSports Performance Bridge</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -13,7 +13,7 @@
         <header class="header">
             <div class="header-content">
                 <div class="logo">
-                    <h1>eSports AI Coach</h1>
+                    <h1>e-Bridge</h1>
                 </div>
                 <nav class="nav">
                     <button class="nav-btn active" data-page="dashboard">
@@ -72,27 +72,38 @@
                             <div class="avatar-placeholder">👤</div>
                         </div>
                         <div class="player-details">
-                            <h3 id="player-name">ProPlayer2024</h3>
-                            <p id="player-rank" class="rank-badge">Diamond II</p>
-                            <p id="player-game">League of Legends</p>
+                            <h3 id="player-name">プレイヤー</h3>
+                            <p id="player-rank" class="rank-badge">ランク未設定</p>
+                            <p id="player-game">ゲーム未選択</p>
                         </div>
                     </div>
                     <div class="stats-grid">
                         <div class="stat-item">
                             <span class="stat-label">勝率</span>
-                            <span class="stat-value" id="win-rate">58.5%</span>
+                            <span class="stat-value" id="win-rate">-</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">平均KDA</span>
-                            <span class="stat-value" id="avg-kda">3.5</span>
+                            <span class="stat-value" id="avg-kda">-</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">CS/分</span>
-                            <span class="stat-value" id="cs-per-min">7.2</span>
+                            <span class="stat-value" id="cs-per-min">-</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">試合数</span>
-                            <span class="stat-value" id="games-played">256</span>
+                            <span class="stat-value" id="games-played">-</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Game Selection Guidance -->
+                    <div class="game-selection-guidance" id="game-selection-guidance">
+                        <div class="guidance-content">
+                            <h4>🎮 ゲームを選択してください</h4>
+                            <p>パフォーマンス分析を開始するために、プレイしているゲームを設定しましょう</p>
+                            <button class="btn-primary guidance-btn" id="goto-game-selection">
+                                ゲームを選択する
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -113,18 +124,44 @@
                 <div class="card">
                     <h3>最近の試合結果</h3>
                     <div id="recent-matches" class="matches-list">
-                        <!-- Recent matches will be populated here -->
+                        <div class="no-matches-message">
+                            <p class="message-text">まだ試合データがありません</p>
+                            <p class="message-sub">分析タブから試合結果を入力してください</p>
+                            <button class="btn-secondary" id="goto-analysis">
+                                試合データを入力する →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dashboard Goals -->
+                <div class="card dashboard-goals" id="dashboard-goals">
+                    <div class="goals-header">
+                        <h3>🎯 現在の目標</h3>
+                        <button class="view-all-goals" id="view-all-goals">すべて見る</button>
+                    </div>
+                    <div class="dashboard-goals-list" id="dashboard-goals-list">
+                        <div class="no-goals-message">
+                            <h4>目標が設定されていません</h4>
+                            <p>パフォーマンス向上のための目標を設定しましょう</p>
+                            <button class="add-goal-btn" id="add-first-goal">最初の目標を追加</button>
+                        </div>
                     </div>
                 </div>
 
                 <!-- AI Recommendations -->
                 <div class="card ai-recommendations">
                     <div class="ai-header">
-                        <h3>🤖 AIコーチングの推奨事項</h3>
-                        <button id="refresh-ai-btn" class="refresh-btn">🔄</button>
+                        <h3>🤖 今日のコーチングアドバイス</h3>
+                        <button id="refresh-coaching" class="refresh-btn">🔄</button>
                     </div>
                     <div id="ai-recommendations-content" class="recommendations-content">
-                        <!-- AI recommendations will be populated here -->
+                        <div class="no-recommendations-message">
+                            <p class="message-text">目標を設定してパーソナライズされたアドバイスを受け取りましょう</p>
+                            <button class="btn-secondary" id="goto-goals-for-ai">
+                                目標を設定する
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -185,24 +222,6 @@
                 <div class="page-header">
                     <h2>🤖 AIチャット</h2>
                     <p>Gemini AI とリアルタイムチャットしてゲームのアドバイスを受けよう</p>
-                </div>
-
-                <!-- API Settings -->
-                <div class="card">
-                    <h3>🔑 Gemini API設定</h3>
-                    <div class="form-group">
-                        <label for="gemini-api-key">APIキー</label>
-                        <div class="api-input-group">
-                            <input type="password" id="gemini-api-key" placeholder="Gemini APIキーを入力" autocomplete="off">
-                            <button type="button" class="toggle-btn" id="toggle-gemini-key" title="表示/非表示">
-                                👁️
-                            </button>
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button id="save-gemini-key" class="btn-primary">保存</button>
-                        <button id="test-gemini-connection" class="btn-secondary">接続テスト</button>
-                    </div>
                 </div>
 
                 <!-- Chat Interface -->
@@ -275,26 +294,7 @@
             <div id="media-analysis" class="page">
                 <div class="page-header">
                     <h2>📸 メディア解析</h2>
-                    <p>Gemini Vision AI でゲーム画面・動画を分析してパフォーマンスを向上させよう</p>
-                </div>
-
-                <!-- API Settings -->
-                <div class="card">
-                    <h3>🔑 Gemini Vision API設定</h3>
-                    <div class="form-group">
-                        <label for="gemini-vision-api-key">APIキー</label>
-                        <div class="api-input-group">
-                            <input type="password" id="gemini-vision-api-key" placeholder="Gemini APIキーを入力" autocomplete="off">
-                            <button type="button" class="toggle-btn" id="toggle-vision-key" title="表示/非表示">
-                                👁️
-                            </button>
-                        </div>
-                        <small class="api-note">※ 同じGemini APIキーで画像・動画解析が可能です</small>
-                    </div>
-                    <div class="form-actions">
-                        <button id="save-vision-key" class="btn-primary">保存</button>
-                        <button id="test-vision-connection" class="btn-secondary">接続テスト</button>
-                    </div>
+                    <p>Gemini 2.5 Proでゲーム画面・動画を分析してパフォーマンスを向上させよう</p>
                 </div>
 
                 <!-- Upload Area -->
@@ -396,7 +396,7 @@
         <div id="login-modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>eSports AI Coach</h2>
+                    <h2>e-Bridge</h2>
                     <p>ログインまたは新規登録</p>
                 </div>
                 
@@ -464,6 +464,102 @@
         </div>
     </div>
 
+    <!-- API Initial Setup Modal -->
+    <div id="api-initial-setup-modal" class="modal api-setup-priority">
+        <div class="modal-overlay"></div>
+        <div class="modal-content api-setup-content">
+            
+            <!-- Header -->
+            <div class="setup-header">
+                <div class="logo-section">
+                    <h1>🌉 e-Bridge</h1>
+                    <p class="tagline">AI-Powered eSports Performance Bridge</p>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="setup-body">
+                <div class="setup-title">
+                    <h2>🔑 APIキー初期設定</h2>
+                    <p>e-BridgeのAI機能を使用するには、Gemini APIキーが必要です</p>
+                </div>
+                
+                <!-- API Key Input Area -->
+                <div class="api-input-section">
+                    <label for="initial-api-key">Gemini APIキー</label>
+                    <div class="input-wrapper">
+                        <input type="password" 
+                               id="initial-api-key" 
+                               placeholder="APIキーを入力"
+                               autocomplete="off">
+                        <button id="toggle-initial-key" class="eye-btn">👁️</button>
+                    </div>
+                    <div class="input-helper">
+                        <p>APIキーは一度設定すれば、すべてのAI機能で共通使用されます</p>
+                    </div>
+                </div>
+                
+                <!-- Feature Information -->
+                <div class="features-info">
+                    <h3>利用可能になる機能：</h3>
+                    <div class="feature-list">
+                        <div class="feature-item">
+                            <span class="feature-icon">💬</span>
+                            <div>
+                                <strong>AIチャット</strong>
+                                <p>パーソナライズされたコーチング</p>
+                                <small class="model-info">Gemini 2.5 Flash</small>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">📸</span>
+                            <div>
+                                <strong>メディア解析</strong>
+                                <p>スクリーンショット・動画分析</p>
+                                <small class="model-info">Gemini 2.5 Pro</small>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">🎯</span>
+                            <div>
+                                <strong>目標別アドバイス</strong>
+                                <p>目標に応じた具体的な提案</p>
+                                <small class="model-info">Gemini 2.5 Flash</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="setup-actions">
+                    <button id="test-initial-api" class="btn-secondary">
+                        接続テスト
+                    </button>
+                    <button id="save-initial-api" class="btn-primary" disabled>
+                        設定を保存して開始
+                    </button>
+                </div>
+                
+                <!-- API Key Help -->
+                <div class="api-help">
+                    <p>APIキーをお持ちでない方は</p>
+                    <a href="https://makersuite.google.com/app/apikey" 
+                       target="_blank" 
+                       class="api-link">
+                        Google AI Studioで無料取得 →
+                    </a>
+                </div>
+                
+                <!-- Skip Option -->
+                <div class="skip-option">
+                    <button id="skip-api-setup" class="btn-text">
+                        後で設定する（一部機能制限）
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="mock-data.js"></script>
@@ -472,6 +568,7 @@
     <script src="game-categories.js"></script>
     <script src="media-analyzer.js"></script>
     <script src="theme-manager.js"></script>
+    <script src="unified-api-manager.js"></script>
     <script src="gemini-service.js"></script>
     <script src="app.js"></script>
 </body>
