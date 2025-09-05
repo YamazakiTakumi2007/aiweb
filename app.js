@@ -38,7 +38,7 @@ class App {
             this.geminiService = new GeminiService();
         }
         
-        // メディア解析用のファイル配列
+        // プレイヤー統計マネージャー\n        if (typeof PlayerStatsManager !== 'undefined') {\n            this.playerStatsManager = new PlayerStatsManager();\n        }\n        \n        // メディア解析用のファイル配列
         this.uploadedFiles = [];
         this.chatMessages = [];
     }
@@ -893,64 +893,8 @@ class App {
     
     // チャート初期化
     initCharts() {
-        // パフォーマンスチャート
-        const perfCanvas = document.getElementById('performance-chart');
-        if (perfCanvas && typeof Chart !== 'undefined') {
-            const ctx = perfCanvas.getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: ['1週間前', '6日前', '5日前', '4日前', '3日前', '2日前', '昨日', '今日'],
-                    datasets: [{
-                        label: '勝率',
-                        data: [55, 58, 52, 60, 58, 62, 59, 58.5],
-                        borderColor: '#e94560',
-                        backgroundColor: 'rgba(233, 69, 96, 0.1)',
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: false,
-                            min: 40,
-                            max: 70
-                        }
-                    }
-                }
-            });
-        }
-        
-        // KDAチャート
-        const kdaCanvas = document.getElementById('kda-chart');
-        if (kdaCanvas && typeof Chart !== 'undefined') {
-            const ctx = kdaCanvas.getContext('2d');
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['キル', 'デス', 'アシスト'],
-                    datasets: [{
-                        label: '平均',
-                        data: [8.2, 5.3, 10.5],
-                        backgroundColor: ['#4caf50', '#f44336', '#2196f3']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    }
-                }
-            });
-        }
+        // チャートは実際のデータが入力された時のみ初期化する
+        // 初期状態では何も表示しない
     }
     
     // トースト表示
@@ -995,8 +939,9 @@ class App {
     
     // 各ページのロード処理
     loadDashboard() {
-        this.loadRecentMatches();
+        // 新しい統計システムを使用\n        if (this.playerStatsManager) {\n            this.playerStatsManager.loadRecentMatches();\n        } else {\n            this.loadRecentMatches();\n        }
         this.loadAiRecommendations();
+        // 新しい統計システムを使用\n        if (this.playerStatsManager) {\n            this.playerStatsManager.loadStatsToUI();\n        }
     }
     
     loadAnalysis() {
@@ -1024,11 +969,13 @@ class App {
         const container = document.getElementById('recent-matches');
         if (!container) return;
         
-        const matches = [
-            { result: 'WIN', kda: '8/2/11', cs: 285 },
-            { result: 'LOSS', kda: '5/6/8', cs: 243 },
-            { result: 'WIN', kda: '12/3/7', cs: 312 }
-        ];
+        // 実際の試合データをローカルストレージから取得
+        const matches = JSON.parse(localStorage.getItem('recentMatches') || '[]');
+        
+        if (matches.length === 0) {
+            container.innerHTML = '<p class="no-data">試合記録がまだありません</p>';
+            return;
+        }
         
         container.innerHTML = matches.map(match => `
             <div class="match-item ${match.result.toLowerCase()}">
